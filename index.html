@@ -1,90 +1,61 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>سنجشگر آی‌پی کلادفلر از ایران</title>
+    <meta charset="UTF-8">
+    <title>تست لحظه‌ای آی‌پی کلادفلر</title>
     <style>
-        /* استایل خیلی ساده */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl; padding: 20px; background-color: #f4f4f4; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
-        .button { background-color: #0088ff; color: white; border: none; padding: 8px 16px; margin: 4px 2px; cursor: pointer; border-radius: 4px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; direction: ltr; text-align: left; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        th { background-color: #f2f2f2; }
-        .good { background-color: lightgreen; }
-        .bad { background-color: lightcoral; }
+        body { font-family: monospace; direction: ltr; background: #111; color: #0f0; padding: 20px; }
+        .good { background: #0a3a0a; color: #0f0; }
+        .bad { background: #3a0a0a; color: #f99; }
+        .row { padding: 4px; margin: 2px; border-radius: 4px; }
     </style>
 </head>
 <body>
-<div class="container">
-    <h2>آزمایشگر آی‌پی کلادفلر</h2>
-    <p>با کلیک روی دکمه تست، لیستی از آی‌پی‌های کلادفلر با متد <b>HTTP</b> تست می‌شوند و آی‌پی‌هایی که در ایران پاسخ می‌دهند (وضعیت <span class="good">Good</span>) نمایش داده می‌شوند.</p>
-    <button id="testButton" class="button">شروع تست</button>
-    <div id="loading" style="display:none;">در حال تست، لطفا صبر کنید...</div>
-    <div id="resultsArea"></div>
-</div>
+<h2>تست .لحظه‌ای (هر نتیجه به محض دریافت)</h2>
+<div id="log">⏳ در حال تست...</div>
 
 <script>
-    // لیست چند آی‌پی نمونه. شما باید با لیست کاملی از رنج‌ها جایگزینش کنید.
-    const sampleIps = [
-        "188.114.96.0", "188.114.96.1", "188.114.96.2", "188.114.97.0", // نمونه‌ای از رنج‌های وارپ
-        "162.159.192.1", "162.159.193.1", "104.16.0.1", "104.17.0.1"
+    // لیست آی‌پی‌ها (چندتا نمونه)
+    const ips = [
+        "188.114.96.1", "1.1.1.1", "8.8.8.8", "104.16.0.1", "192.0.2.1"
     ];
 
-    const testButton = document.getElementById('testButton');
-    const loadingDiv = document.getElementById('loading');
-    const resultsArea = document.getElementById('resultsArea');
+    const logDiv = document.getElementById('log');
 
-    // تابع تست یک آی‌پی با متد HTTP (درخواست GET)
-    function testIp(ip) {
-        return new Promise((resolve) => {
-            const startTime = performance.now();
-            // استفاده از مسیر /cdn-cgi/trace که معمولا روی همه سرورهای کلادفلر فعال است
-            const testUrl = `http://${ip}/cdn-cgi/trace`;
-            // می‌توانید از https هم استفاده کنید
-            // const testUrl = `https://${ip}/cdn-cgi/trace`;
-
-            fetch(testUrl, { mode: 'no-cors' }) // mode: 'no-cors' به ما اجازه می‌دهد از محدودیت CORS عبور کنیم
-                .then(() => {
-                    const endTime = performance.now();
-                    const latency = Math.round(endTime - startTime);
-                    resolve({ ip, latency, status: 'success' });
-                })
-                .catch(() => {
-                    resolve({ ip, latency: null, status: 'failed' });
-                });
-        });
+    function testOneIp(ip) {
+        const start = performance.now();
+        const url = `http://${ip}/cdn-cgi/trace`;
+        // mode: 'no-cors' برای دور زدن CORS ولی دریافت نکردن محتوا
+        fetch(url, { mode: 'no-cors' })
+            .then(() => {
+                const latency = Math.round(performance.now() - start);
+                showResult(ip, latency, true);
+            })
+            .catch(() => {
+                showResult(ip, null, false);
+            });
     }
 
-    async function runTests() {
-        loadingDiv.style.display = 'block';
-        resultsArea.innerHTML = '<table border="1"><tr><th>آی‌پی</th><th>تأخیر (میلی‌ثانیه)</th><th>وضعیت تست HTTP در ایران</th></tr></table>';
-        const results = [];
+    function showResult(ip, latency, isGood) {
+        const line = document.createElement('div');
+        line.className = `row ${isGood ? 'good' : 'bad'}`;
+        line.innerText = `${ip}  →  ${isGood ? `✅ پاسخ در ${latency} ms` : '❌ بدون پاسخ'}`;
+        logDiv.appendChild(line);
+        // اسکرول خودکار به انتها
+        logDiv.scrollTop = logDiv.scrollHeight;
+    }
 
-        for (const ip of sampleIps) {
-            const result = await testIp(ip);
-            results.push(result);
-            console.log(`تست ${ip}: ${result.status} با تأخیر ${result.latency} ms`);
-
-            // به روزرسانی جدول نتایج به صورت لحظه‌ای
-            const row = resultsArea.insertRow(-1);
-            const cellIp = row.insertCell(0);
-            const cellLatency = row.insertCell(1);
-            const cellStatus = row.insertCell(2);
-            cellIp.innerText = result.ip;
-            cellLatency.innerText = result.latency ? `${result.latency} ms` : 'ناموفق';
-            if (result.status === 'success') {
-                cellStatus.innerText = '✅ Good';
-                cellStatus.className = 'good';
-            } else {
-                cellStatus.innerText = '❌ Bad';
-                cellStatus.className = 'bad';
-            }
+    // اجرای تست روی همه آی‌پی‌ها (به صورت موازی یا ترتیبی؟ برای لحظه‌ای بودن، ترتیبی بهتر است)
+    async function runAll() {
+        logDiv.innerHTML = ''; // پاک کردن قبلی
+        for (let ip of ips) {
+            await testOneIp(ip); // صبر می‌کنیم تا یکی تمام شود بعد برویم سراغ بعدی
+            // برای اینکه همزمان تست شوند (سریعتر) می‌توانید از Promise.all استفاده کنید، ولی خروجی به ترتیب نیست
         }
-
-        loadingDiv.style.display = 'none';
+        logDiv.innerHTML += '<br>🏁 تست تمام شد.';
     }
 
-    testButton.addEventListener('click', runTests);
+    runAll();
 </script>
 </body>
 </html>
